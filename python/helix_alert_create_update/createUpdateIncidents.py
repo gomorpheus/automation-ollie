@@ -1,6 +1,6 @@
-## Script to poll alerts from Morpheus
-## Creates new alert in BMC Helix
-## Updates existing alerts over their lifecycle in BMC Helix
+## Script to poll incidents from Morpheus
+## Creates new incident in BMC Helix
+## Updates existing incidents from open to closed in BMC Helix
 ## Manages state changes between polls of the Morpheus API using a file cache
 ## which should be located in the NFS share of a 3 node Morpheus appliance
 
@@ -32,13 +32,14 @@ helixBaseUrl = "https://nexio-dev-restapi.onbmc.com"
 morpheusToken = "Bearer %s" %(morpheus["morpheus"]["apiAccessToken"])
 morpheusBaseUrl = morpheus["morpheus"]["applianceHost"]
 
-##alertsStateCacheFile = "/var/opt/morpheus/morpheus-ui/caches/alertsStateCache.json"
-alertsStateCacheFile = "./alertsStateCache1.json"
-alertsState = []
-alertsStateAvailable = False
+##alertsStateCacheFile = "/var/opt/morpheus/morpheus-ui/caches/incidentStateCache.json"
+incidentStateCacheFile = "./incidentStateCache1.json"
+incidentState = []
+incidentStateAvailable = False
+
+## TODO review use of these globals
 newAlerts = False
 updatedAlerts = False
-## TODO review use of these globals
 pollIntervalSecs = 300
 
 ## gives us the time since last poll
@@ -60,8 +61,8 @@ def getSince(pollInt):
 ## we use this to create the first state file against which we can start to compare
 ## subsequent calls, each time updating the state with the latest results
 def preflight():
-    global alertsStateAvailable
-    global alertsState
+    global incidentStateAvailable
+    global incidentState
     global morpheusBaseUrl
     global morpheusToken
 
@@ -69,22 +70,22 @@ def preflight():
     debugP(msg)
 
     ## check for cache, if exists load it
-    if exists(alertsStateCacheFile):
-        alertsStateAvailable = True
-        f = open(alertsStateCacheFile, "r")
+    if exists(incidentStateCacheFile):
+        incidentStateAvailable = True
+        f = open(incidentStateCacheFile, "r")
         state = f.read()
-        alertsState = json.loads(state)
-        print("INFO: cached alerts have been read from disk")
-        msg = "alertsStateAvailable: %s" % alertsStateAvailable
+        incidentState = json.loads(state)
+        print("INFO: cached incidents have been read from disk")
+        msg = "incidentStateAvailable: %s" % incidentStateAvailable
         debugP(msg)
-        debugP("alerts from state:")
-        debugP(alertsState)
+        debugP("incidents from state:")
+        debugP(incidentState)
     else:
         ## if not exist make an initial api call and use this as state
-        alerts = pollIncidents(morpheusBaseUrl, morpheusToken)
-        alertsState = alerts
-        debugP("alerts from initial pull:")
-        debugP(alertsState)
+        incidents = pollIncidents(morpheusBaseUrl, morpheusToken)
+        incidentState = incidents
+        debugP("incidents from initial pull:")
+        debugP(incidentState)
 
 ## login with username & password to obtain JWT for session
 def authenticate(user, password):
@@ -143,24 +144,24 @@ def debugP(message):
 ## get incidents from morpheus with API
 def pollIncidents(baseURL, token):
     ##lastUpdated = getSince(pollIntervalSecs)
-    alertsAPI = "https://%s/api/monitoring/incidents?max=1000&offset=0&Status=open" % (baseURL)
+    incidentsAPI = "https://%s/api/monitoring/incidents?max=1000&offset=0&Status=open" % (baseURL)
     headers = {
         "accept": "application/json",
         "authorization": token
     }
-    res = requests.get(alertsAPI, headers=headers, verify=False)
-    alerts = res.json()["incidents"]
-    debugP("%s incident(s) found" % len(alerts))
-    debugP(alerts)
-    return alerts
+    res = requests.get(incidentsAPI, headers=headers, verify=False)
+    incidents = res.json()["incidents"]
+    debugP("%s incident(s) found" % len(incidents))
+    debugP(incidents)
+    return incidents
 
 
 def main():
     ## pre-flight, prints some debug, checks for existence of cache and if exists loads it
     preflight()
 
-    ## poll morpheus alerts
-    morpheusAlerts = pollIncidents(morpheusBaseUrl, morpheusToken)
+    ## poll morpheus incidents
+    morpheusIncidents = pollIncidents(morpheusBaseUrl, morpheusToken)
 
     ## we have state and we have polled API, we need to compare JSON objects
     ## if in API call and not state file it is new incident
