@@ -37,19 +37,6 @@ incidentStateCacheFile = "./incidentStateCache.json"
 incidentState = []
 firstPass = False
 
-## gives us the time since last poll
-## in format required for lastUpdated in query
-## TODO we won't use this remove if not, incidents cannot be queried by lastUpdated
-def getSince(pollInt):
-    ## we need this format
-    ## 2019-03-06T17:52:29+0000
-    now = datetime.now().timestamp()
-    since = int(now) - pollInt
-    formatted = datetime.utcfromtimestamp(since).strftime('%Y-%m-%d %H:%M:%S')
-    msg = "Since: %s" % formatted
-    debugP(msg)
-    return formatted
-
 ## in preflight we have some simple debugging plus
 ## we either load the previous state from the state cache if it exists
 ## or we make an initial call to incidents endpont to get the current items
@@ -140,7 +127,6 @@ def debugP(message):
 
 ## get incidents from morpheus with API
 def pollIncidents(baseURL, token):
-    ##lastUpdated = getSince(pollIntervalSecs)
     incidentsAPI = "https://%s/api/monitoring/incidents?max=1000&offset=0&status=open" % (baseURL)
     headers = {
         "accept": "application/json",
@@ -204,8 +190,6 @@ def main():
             ## closed incident
             closedIncidents.append(sInc)
 
-
-
     print("INFO: closed incidents: %s" %(len(closedIncidents)))
 
     if (len(closedIncidents) > 0 or len(newIncidents) > 0):
@@ -239,25 +223,19 @@ def main():
                     ## call to helix to update the incident to closed
                     debugP("closing morpheus incident id: %s, helix id: %s in helix" % (cInc["id"], cInc["helixID"]))
 
-            print("")
         ## if we opened a session we need to logout before exit
-
-
         logout(headers)
     else:
         print("INFO: there are no updates to make on helix")
 
-
-    ## we need to update the state file even if no changes, as we haven't written it yet
     ## if this is a first pass we need to add a dummy helix id, so we can ignore these and not attempt to close them
     ## because we will not have created them in Helix
     if firstPass:
         debugP("first pass adding dummy helixID")
-        dummyCounter = 0
         for mInc in morpheusIncidents:
             morpheusIncidents[dummyCounter]["helixID"] = "dummy"
-            dummyCounter += 1
 
+    ## we need to update the state file even if no changes, as we haven't written it yet
     writeIncidentStateFile(morpheusIncidents)
 
     print("INFO: script execution complete")
