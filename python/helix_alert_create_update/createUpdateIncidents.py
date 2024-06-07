@@ -146,6 +146,49 @@ def writeIncidentStateFile(incidents):
     print("INFO: incidents cached for tracking in file: %s" % incidentStateCacheFile)
 
 
+def createNewHelixIncident(headers, newIncident):
+    print("INFO: creating incident in helix, morpheus id: %s" % newIncident["id"])
+
+    createUrl = "%s/api/arsys/v1/entry/HPD:IncidentInterface_Create?fields=values(Incident%20Number)" % helixBaseUrl
+
+    ## map morpheus incident info to these helix incident properties
+    values = {
+        "First_Name":,
+        "Last_Name":,
+        "Description":,
+        "Impact":,
+        "Urgency":,
+        "Status":,
+        "Reported_Resource":,
+        "Service_Type":,
+    }
+
+    requestBody = {
+        "values": values
+    }
+
+    postData = json.dumps(requestBody)
+    debugP("request body post data: %s" % postData)
+
+    helixIncidentID = ""
+
+    r = requests.post(createUrl, headers=headers, verify=False, data=postData)
+    if not r.ok:
+        print("ERROR: creating helix incident, response code %s: %s" % (r.status_code, r.text))
+        raise Exception("Error creating helix incident, response code %s: %s" % (r.status_code, r.text))
+    else:
+        if r.status_code == 201:
+            res = json.loads(r.text)
+            helixIncidentID = res["values"]["Incident Number"]
+            print("INFO: helix incident created, helix incident number: %s'" % helixIncidentID)
+
+    return helixIncidentID
+
+
+def closeHelixIncident(helixID):
+    debugP("closing helix incident id: %s" % helixID)
+
+
 def main():
     newIncidents = []
     closedIncidents = []
@@ -205,12 +248,13 @@ def main():
                 debugP("newIncidents %s, incident %s" % (newIncidents, nInc['id']))
 
                 ## call to helix to create incident
+                helixID = createNewHelixIncident(headers, cInc)
                 debugP("creating incident: %s in helix" % cInc["id"])
 
                 ## we need to add the helix ID
                 for mInc in morpheusIncidents:
                     if nInc["id"] == mInc["id"]:
-                        mInc["helixID"] = "new"
+                        mInc["helixID"] = helixID
 
 
         if len(closedIncidents) > 0:
@@ -221,6 +265,7 @@ def main():
                 ## ignore all closed incidents with helixID of "dummy"
                 if cInc["helixID"] != "dummy":
                     ## call to helix to update the incident to closed
+                    closeHelixIncident(cInc["helixID"])
                     debugP("closing morpheus incident id: %s, helix id: %s in helix" % (cInc["id"], cInc["helixID"]))
 
         ## if we opened a session we need to logout before exit
@@ -233,7 +278,7 @@ def main():
     if firstPass:
         debugP("first pass adding dummy helixID")
         for mInc in morpheusIncidents:
-            morpheusIncidents[dummyCounter]["helixID"] = "dummy"
+            mInc["helixID"] = "dummy"
 
     ## we need to update the state file even if no changes, as we haven't written it yet
     writeIncidentStateFile(morpheusIncidents)
