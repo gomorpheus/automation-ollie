@@ -152,15 +152,21 @@ def createNewHelixIncident(headers, newIncident):
     createUrl = "%s/api/arsys/v1/entry/HPD:IncidentInterface_Create?fields=values(Incident%20Number)" % helixBaseUrl
 
     ## map morpheus incident info to these helix incident properties
+
+    ## conditional description, use comment as will be manually created
+    description  = newIncident["lastError"]
+    if newIncident["comment"] != "":
+        description = newIncident["comment"]
+
     values = {
-        "First_Name":,
-        "Last_Name":,
-        "Description":,
-        "Impact":,
-        "Urgency":,
-        "Status":,
-        "Reported_Resource":,
-        "Service_Type":,
+        "First_Name":"Morpheus",
+        "Last_Name": "Incident (%s)" % (newIncident["id"]),
+        "Description": description, ## will be 'lastError' if system raised or 'comment' if manually created
+        "Impact": newIncident["severity"],
+        "Urgency": newIncident["severity"],
+        "Status": newIncident["status"],
+        "Reported_Resource": newIncident["displayName"],
+        "Service_Type": "??",
     }
 
     requestBody = {
@@ -185,8 +191,33 @@ def createNewHelixIncident(headers, newIncident):
     return helixIncidentID
 
 
-def closeHelixIncident(helixID):
-    debugP("closing helix incident id: %s" % helixID)
+def closeHelixIncident(headers, helixIncident):
+
+    print("INFO: closing incident in helix, helix incident id: %s" % helixIncident["helixID"])
+
+    closeUrl = "%s/api/arsys/v1/entry/HPD:IncidentInterface/%s" % (helixBaseUrl, helixIncident["helixID"])
+
+    ## map morpheus incident info to these helix incident properties
+    values = {
+        "Status": "Resolved",
+    }
+
+    requestBody = {
+        "values": values
+    }
+
+    postData = json.dumps(requestBody)
+    debugP("request body post data: %s" % postData)
+
+    r = requests.put(closeUrl, headers=headers, verify=False, data=postData)
+    if not r.ok:
+        print("ERROR: closing helix incident, response code %s: %s" % (r.status_code, r.text))
+        raise Exception("Error closing helix incident, response code %s: %s" % (r.status_code, r.text))
+    else:
+        if r.status_code == 200:
+            res = json.loads(r.text)
+            helixIncidentID = res["values"]["Incident Number"]
+            print("INFO: helix incident number closed: %s'" % helixIncidentID)
 
 
 def main():
@@ -265,7 +296,7 @@ def main():
                 ## ignore all closed incidents with helixID of "dummy"
                 if cInc["helixID"] != "dummy":
                     ## call to helix to update the incident to closed
-                    closeHelixIncident(cInc["helixID"])
+                    closeHelixIncident(cInc)
                     debugP("closing morpheus incident id: %s, helix id: %s in helix" % (cInc["id"], cInc["helixID"]))
 
         ## if we opened a session we need to logout before exit
