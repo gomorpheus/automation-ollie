@@ -158,15 +158,61 @@ def createNewHelixIncident(headers, newIncident):
     if newIncident["comment"] != "":
         description = newIncident["comment"]
 
+    hImpact = ""
+    hUrgency= ""
+    hPriority= ""
+
+    ## conditional helix impact, urgency & priority
+    ## we will map to first three (critical, warning, info)
+    ## impact
+    ## 1-Extensive/Widespread
+    ## 2-Significant/Large
+    ## 3-Moderate/Limited
+    ## 4-Minor/Localized
+    ##
+    ## urgency
+    ## 1-Critical
+    ## 2-High
+    ## 3-Medium
+    ## 4-Low
+    ##
+    ## priority
+    ## Critical
+    ## High
+    ## Medium
+    ## Low
+
+    match newIncident["severity"]:
+        case "critical":
+            hImpact = "1-Extensive/Widespread"
+            hUrgency= "1-Critical"
+            hPriority= "Critical"
+
+        case "warning":
+            hImpact = "2-Signifcant/Large"
+            hUrgency= "2-High"
+            hPriority= "High"
+
+        case "info":
+            hImpact = "3-Moderate/Limited"
+            hUrgency= "3-Medium"
+            hPriority= "Medium"
+
+    ## condiitional status
+    ## open -> New
+    ## closed -> Resolved
+
     values = {
         "First_Name":"Morpheus",
         "Last_Name": "Incident (%s)" % (newIncident["id"]),
+        "Company": "", ## requested added should be tenant/account (probably name so think will need a another API call)
         "Description": description, ## will be 'lastError' if system raised or 'comment' if manually created
-        "Impact": newIncident["severity"],
-        "Urgency": newIncident["severity"],
-        "Status": newIncident["status"],
+        "Impact": hImpact,
+        "Urgency": hUrgency,
+        "Status": "New", ## Helix uses "New" & "Resolved' in place of Morpheus "open" & "closed"
+        "Priority": hPriority, ## requested add
         "Reported_Resource": newIncident["displayName"],
-        "Service_Type": "??",
+        "Service_Type": "Morpheus",
     }
 
     requestBody = {
