@@ -138,6 +138,21 @@ def pollIncidents(baseURL, token):
     debugP(incidents)
     return incidents
 
+
+## get account name (tenant)
+def getAccountName(baseURL, token, accountID):
+    tenantsAPI = "https://%s/api/accounts/%s" % (baseURL, accountID)
+    headers = {
+        "accept": "application/json",
+        "authorization": token
+    }
+    res = requests.get(tenantsAPI, headers=headers, verify=False)
+    account = res.json()["account"]
+    debugP("API response: account id: '%s' account name: '%s' found" % (account["id"], account["name"]))
+    debugP(account)
+    return account["name"]
+
+
 def writeIncidentStateFile(incidents):
     global incidentStateCacheFile
     f = open(incidentStateCacheFile, "w")
@@ -146,11 +161,11 @@ def writeIncidentStateFile(incidents):
     print("INFO: incidents cached for tracking in file: %s" % incidentStateCacheFile)
 
 
-def createNewHelixIncident(headers, newIncident):
+def createNewHelixIncident(headers, newIncident, accountName):
     print("INFO: creating incident in helix, morpheus id: %s" % newIncident["id"])
 
-    createUrl = "%s/api/arsys/v1/entry/HPD:IncidentInterface_Create?fields=values(Incident%20Number)" % helixBaseUrl
-
+    createUrl = "%s/api/arsys/v1/entry/HPD:IncidentInterface_Create" % helixBaseUrl
+    createUrl += "?fields=values(Incident%20Number)"
     ## map morpheus incident info to these helix incident properties
 
     ## conditional description, use comment as will be manually created
@@ -182,18 +197,18 @@ def createNewHelixIncident(headers, newIncident):
     ## Medium
     ## Low
 
-    match newIncident["severity"]:
-        case "critical":
+    sev = newIncident["severity"]
+    if sev == "critical":
             hImpact = "1-Extensive/Widespread"
             hUrgency= "1-Critical"
             hPriority= "Critical"
 
-        case "warning":
+    elif sev == "warning":
             hImpact = "2-Signifcant/Large"
             hUrgency= "2-High"
             hPriority= "High"
 
-        case "info":
+    elif sev == "info":
             hImpact = "3-Moderate/Limited"
             hUrgency= "3-Medium"
             hPriority= "Medium"
@@ -203,15 +218,15 @@ def createNewHelixIncident(headers, newIncident):
     ## closed -> Resolved
 
     values = {
-        "First_Name":"Morpheus",
-        "Last_Name": "Incident (%s)" % (newIncident["id"]),
-        "Company": "", ## requested added should be tenant/account (probably name so think will need a another API call)
+        "First_Name":"Pierre",
+        "Last_Name": "Van de Merwe",
+        "Company": accountName, ## requested added should be tenant/account (probably name so think will need a another API call)
         "Description": description, ## will be 'lastError' if system raised or 'comment' if manually created
         "Impact": hImpact,
         "Urgency": hUrgency,
         "Status": "New", ## Helix uses "New" & "Resolved' in place of Morpheus "open" & "closed"
         "Priority": hPriority, ## requested add
-        "Reported_Resource": newIncident["displayName"],
+        "Reported Source": newIncident["displayName"],
         "Service_Type": "Morpheus",
     }
 
@@ -324,9 +339,12 @@ def main():
             for nInc in newIncidents:
                 debugP("newIncidents %s, incident %s" % (newIncidents, nInc['id']))
 
+                ## get the account name
+                accountName = getAccountName(morpheusBaseUrl, morpheusToken, nInc['account']['id'])
+
                 ## call to helix to create incident
-                helixID = createNewHelixIncident(headers, cInc)
-                debugP("creating incident: %s in helix" % cInc["id"])
+                helixID = createNewHelixIncident(headers, nInc, accountName)
+                debugP("creating incident: %s in helix" % nInc["id"])
 
                 ## we need to add the helix ID
                 for mInc in morpheusIncidents:
