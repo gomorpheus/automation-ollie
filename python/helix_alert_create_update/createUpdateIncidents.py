@@ -27,7 +27,7 @@ debug = True
 ## configuration
 helixUser = c.get("secret/helixUser")
 helixPassword = c.get("secret/helixPassword")
-helixBaseUrl = "https://nexio-dev-restapi.onbmc.com"
+helixBaseUrl = "https://nexio-qa-restapi.onbmc.com"
 
 morpheusToken = "Bearer %s" %(morpheus["morpheus"]["apiAccessToken"])
 morpheusBaseUrl = morpheus["morpheus"]["applianceHost"]
@@ -163,13 +163,17 @@ def writeIncidentStateFile(incidents):
 
 def createNewHelixIncident(headers, newIncident, accountName):
     print("INFO: creating incident in helix, morpheus id: %s" % newIncident["id"])
-
+    ##createUrl="https://nexio-restapi.onbmc.com/api/arsys/v1/entry/HPD:IncidentInterface_Create" ## prod test
     createUrl = "%s/api/arsys/v1/entry/HPD:IncidentInterface_Create" % helixBaseUrl
     createUrl += "?fields=values(Incident%20Number)"
     ## map morpheus incident info to these helix incident properties
 
     ## conditional description, use comment as will be manually created
-    description  = newIncident["lastError"]
+
+    description = "None available"
+    if newIncident["lastError"]!= "":
+        description  = newIncident["lastError"]
+
     if newIncident["comment"] != "":
         description = newIncident["comment"]
 
@@ -180,54 +184,55 @@ def createNewHelixIncident(headers, newIncident, accountName):
     ## conditional helix impact, urgency & priority
     ## we will map to first three (critical, warning, info)
     ## impact
-    ## 1-Extensive/Widespread
-    ## 2-Significant/Large
-    ## 3-Moderate/Limited
-    ## 4-Minor/Localized
+    ## 1-Extensive/Widespread (1000)
+    ## 2-Significant/Large (2000)
+    ## 3-Moderate/Limited (3000)
+    ## 4-Minor/Localized (4000)
     ##
     ## urgency
-    ## 1-Critical
-    ## 2-High
-    ## 3-Medium
-    ## 4-Low
+    ## 1-Critical (1000)
+    ## 2-High (2000)
+    ## 3-Medium (3000)
+    ## 4-Low (4000)
     ##
     ## priority
-    ## Critical
-    ## High
-    ## Medium
-    ## Low
+    ## Critical (1000)
+    ## High (2000)
+    ## Medium (3000)
+    ## Low (4000)
 
     sev = newIncident["severity"]
     if sev == "critical":
-            hImpact = "1-Extensive/Widespread"
-            hUrgency= "1-Critical"
-            hPriority= "Critical"
+            hImpact = "1000" ##"1-Extensive/Widespread"
+            hUrgency = "1000" ##"1-Critical"
+            hPriority= "1000" ##"Critical"
 
     elif sev == "warning":
-            hImpact = "2-Signifcant/Large"
-            hUrgency= "2-High"
-            hPriority= "High"
+            hImpact = "2000" ##"2-Signifcant/Large"
+            hUrgency= "2000" ##"2-High"
+            hPriority= "2000" ##"High"
 
     elif sev == "info":
-            hImpact = "3-Moderate/Limited"
-            hUrgency= "3-Medium"
-            hPriority= "Medium"
+            hImpact = "3000" ##"3-Moderate/Limited"
+            hUrgency= "3000" ##"3-Medium"
+            hPriority= "3000" ##"Medium"
 
     ## condiitional status
     ## open -> New
     ## closed -> Resolved
 
     values = {
-        "First_Name":"Pierre",
-        "Last_Name": "Van de Merwe",
+        "First_Name":"Riaan",
+        "Last_Name": "van Schalkwyk",
         "Company": accountName, ## requested added should be tenant/account (probably name so think will need a another API call)
-        "Description": description, ## will be 'lastError' if system raised or 'comment' if manually created
+        "Description": "%s (%s)" % (newIncident["displayName"], description), ## will be 'lastError' if system raised or 'comment' if manually created
         "Impact": hImpact,
         "Urgency": hUrgency,
-        "Status": "New", ## Helix uses "New" & "Resolved' in place of Morpheus "open" & "closed"
+        "Status": "0", ##"New", ## Helix uses "New" & "Resolved' in place of Morpheus "open" & "closed"
         "Priority": hPriority, ## requested add
-        "Reported Source": newIncident["displayName"],
-        "Service_Type": "Morpheus",
+        "Reported Source": "3000", ##"External Escalation",
+        "Service_Type": "3", ## Infrastructure Event
+        "Assigned Support Company": "Nexio",
     }
 
     requestBody = {
@@ -360,7 +365,7 @@ def main():
                 ## ignore all closed incidents with helixID of "dummy"
                 if cInc["helixID"] != "dummy":
                     ## call to helix to update the incident to closed
-                    closeHelixIncident(cInc)
+                    closeHelixIncident(headers, cInc)
                     debugP("closing morpheus incident id: %s, helix id: %s in helix" % (cInc["id"], cInc["helixID"]))
 
         ## if we opened a session we need to logout before exit
