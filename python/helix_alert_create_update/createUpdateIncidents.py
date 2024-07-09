@@ -165,7 +165,7 @@ def createNewHelixIncident(headers, newIncident, accountName):
     print("INFO: creating incident in helix, morpheus id: %s" % newIncident["id"])
     ##createUrl="https://nexio-restapi.onbmc.com/api/arsys/v1/entry/HPD:IncidentInterface_Create" ## prod test
     createUrl = "%s/api/arsys/v1/entry/HPD:IncidentInterface_Create" % helixBaseUrl
-    createUrl += "?fields=values(Incident%20Number)"
+    createUrl += "?fields=values(Incident%20Number,Request%20ID)"
     ## map morpheus incident info to these helix incident properties
 
     ## conditional description, use comment as will be manually created
@@ -243,6 +243,7 @@ def createNewHelixIncident(headers, newIncident, accountName):
     debugP("request body post data: %s" % postData)
 
     helixIncidentID = ""
+    helixRequestID = ""
 
     r = requests.post(createUrl, headers=headers, verify=False, data=postData)
     if not r.ok:
@@ -252,16 +253,20 @@ def createNewHelixIncident(headers, newIncident, accountName):
         if r.status_code == 201:
             res = json.loads(r.text)
             helixIncidentID = res["values"]["Incident Number"]
+            helixRequestID = res["values"]["Request ID"]
             print("INFO: helix incident created, helix incident number: %s'" % helixIncidentID)
 
-    return helixIncidentID
+            ## note that docs show Incident ID return. We appear to need request ID for all post create operations
+            print("INFO: helix incident created, request id: %s'" % helixRequestID)
+
+    return helixRequestID
 
 
 def closeHelixIncident(headers, helixIncident):
 
-    print("INFO: closing incident in helix, helix incident id: %s" % helixIncident["helixID"])
+    print("INFO: closing incident in helix, helix request id: %s" % helixIncident["helixID"])
 
-    closeUrl = "%s/api/arsys/v1/entry/HPD:IncidentInterface/%s" % (helixBaseUrl, helixIncident["helixID"])
+    closeUrl = "%s/api/arsys/v1/entry/HPD:IncidentInterface_Create/%s" % (helixBaseUrl, helixIncident["helixID"])
 
     ## map morpheus incident info to these helix incident properties
     values = {
