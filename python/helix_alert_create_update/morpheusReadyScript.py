@@ -58,9 +58,19 @@ def preflight():
         f = open(incidentStateCacheFile, "r")
         state = f.read()
         incidentState = json.loads(state)
-        print("INFO: cached incidents have been read from disk")
-        debugP("incidents from state:")
-        debugP(incidentState)
+
+        if len(incidentState) == 0:
+            print("INFO: no cached incidents in state file so also first run")
+            ## if not exist make an initial api call and use this as state
+            incidents = pollIncidents(morpheusBaseUrl, morpheusToken)
+            incidentState = incidents
+            firstPass = True
+            debugP("incidents from initial pull:")
+            debugP(incidentState)
+        else:
+            print("INFO: cached incidents have been read from disk")
+            debugP("incidents from state:")
+            debugP(incidentState)
     else:
         ## if not exist make an initial api call and use this as state
         incidents = pollIncidents(morpheusBaseUrl, morpheusToken)
